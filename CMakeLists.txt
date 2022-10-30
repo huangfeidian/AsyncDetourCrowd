@@ -10,14 +10,17 @@ if(MSVC)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++latest")
 endif(MSVC)
 
-find_package(RecastNavigation REQUIRED)
+include(FindPkgConfig)
+set(ENV{PKG_CONFIG_PATH} /usr/local/lib/pkgconfig)
+pkg_search_module(RecastNavigation REQUIRED recastnavigation)
+
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
 
 FILE(GLOB_RECURSE SRC_LISTS ${CMAKE_SOURCE_DIR}/src/*.cpp)
 FILE(GLOB_RECURSE HEADER_LISTS ${CMAKE_SOURCE_DIR}/include/*.h)
 
 add_library(${PROJECT_NAME} ${SRC_LISTS} ${HEADER_LISTS})
-target_link_libraries(${PROJECT_NAME} RecastNavigation::DetourCrowd)
+target_link_libraries(${PROJECT_NAME} DetourCrowd)
 add_subdirectory(./test)
 
 foreach(p LIB BIN INCLUDE)
