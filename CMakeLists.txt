@@ -8,11 +8,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 if(MSVC)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++latest")
+set(PKG_CONFIG_EXECUTABLE "$ENV{usr}/bin/pkg-config.exe")
 endif(MSVC)
 
 include(FindPkgConfig)
 set(ENV{PKG_CONFIG_PATH} /usr/local/lib/pkgconfig)
 pkg_search_module(RecastNavigation REQUIRED recastnavigation)
+INCLUDE_DIRECTORIES(${RecastNavigation_INCLUDE_DIRS})
 
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
 
