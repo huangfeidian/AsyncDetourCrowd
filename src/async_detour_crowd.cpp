@@ -1,13 +1,140 @@
 #include "async_detour_crowd.h"
 
+namespace
+{
+	static const int NAVMESHSET_MAGIC = 'M' << 24 | 'S' << 16 | 'E' << 8 | 'T'; //'MSET';
+	static const int NAVMESHSET_VERSION = 1;
+#pragma pack(push, 4)
+	struct NavMeshSetHeader
+	{
+		int magic;
+		int version;
+		int numTiles;
+		dtNavMeshParams params;
+	};
+
+	struct NavMeshTileHeader
+	{
+		dtTileRef tileRef;
+		int dataSize;
+	};
+#pragma pack(pop)
+	dtNavMesh* load_nav_mesh(const char* path)
+	{
+		FILE* fp = fopen(path, "rb");
+		if (!fp) return 0;
+
+		// Read header.
+		NavMeshSetHeader header;
+		size_t readLen = fread(&header, sizeof(NavMeshSetHeader), 1, fp);
+		if (readLen != 1)
+		{
+			fclose(fp);
+			return 0;
+		}
+		if (header.magic != NAVMESHSET_MAGIC)
+		{
+			fclose(fp);
+			return 0;
+		}
+		if (header.version != NAVMESHSET_VERSION)
+		{
+			fclose(fp);
+			return 0;
+		}
+
+		dtNavMesh* mesh = dtAllocNavMesh();
+		if (!mesh)
+		{
+			fclose(fp);
+			return 0;
+		}
+		dtStatus status = mesh->init(&header.params);
+		if (dtStatusFailed(status))
+		{
+			fclose(fp);
+			return 0;
+		}
+
+		// Read tiles.
+		for (int i = 0; i < header.numTiles; ++i)
+		{
+			NavMeshTileHeader tileHeader;
+			readLen = fread(&tileHeader, sizeof(tileHeader), 1, fp);
+			if (readLen != 1)
+			{
+				fclose(fp);
+				return 0;
+			}
+
+			if (!tileHeader.tileRef || !tileHeader.dataSize)
+				break;
+
+			unsigned char* data = (unsigned char*)dtAlloc(tileHeader.dataSize, DT_ALLOC_PERM);
+			if (!data) break;
+			memset(data, 0, tileHeader.dataSize);
+			readLen = fread(data, tileHeader.dataSize, 1, fp);
+			if (readLen != 1)
+			{
+				dtFree(data);
+				fclose(fp);
+				return 0;
+			}
+
+			mesh->addTile(data, tileHeader.dataSize, DT_TILE_FREE_DATA, tileHeader.tileRef, 0);
+		}
+
+		fclose(fp);
+
+		return mesh;
+	}
+}
 namespace spiritsaway::system::navigation
 {
+
+	async_detour_crowd::async_detour_crowd(std::uint32_t max_agent_num)
+		: m_max_agent_num(max_agent_num)
+		, m_agents(max_agent_num)
+		, m_finished_agent_vec(max_agent_num)
+		, m_active_agent_vec(max_agent_num)
+		, m_last_update_ms(0)
+		, m_dt_update_finish(true)
+	{
+		m_inactive_agent_idxes.reserve(max_agent_num);
+		for (std::uint32_t i = 0; i < max_agent_num; i++)
+		{
+			m_inactive_agent_idxes.push_back(i);
+		}
+		std::reverse(m_inactive_agent_idxes.begin(), m_inactive_agent_idxes.end());
+	}
+
+	bool async_detour_crowd::init(const std::string& nav_map, const std::array<dtReal_t, 3>& half_extend, dtReal_t max_agent_radius)
+	{
+		if (m_navmesh)
+		{
+			return false;
+		}
+		m_half_extend = half_extend;
+		m_navmesh = load_nav_mesh(nav_map.c_str());
+		if (!m_navmesh)
+		{
+			return false;
+		}
+		if (!m_detour_crowd.init(m_max_agent_num, max_agent_radius, m_navmesh))
+		{
+			dtFreeNavMesh(m_navmesh);
+			m_navmesh = nullptr;
+			return false;
+		}
+		return true;
+
+	}
 	void async_detour_crowd::add_agent_req(agent_req_info&& cur_req)
 	{
 		std::unique_lock<std::mutex> temp_lock(m_mutex);
 		m_agent_reqs.push_back(std::move(cur_req));
 	}
-	std::optional<std::uint32_t> async_detour_crowd::add_agent(const dtCrowdAgentParams& param, const std::array<double, 3>& pos)
+	std::optional<std::uint32_t> async_detour_crowd::add_agent(const ExtendDetourCrowdAgentParams& param, const std::array<dtReal_t, 3>& pos)
 	{
 		if (m_inactive_agent_idxes.empty())
 		{
@@ -59,7 +186,7 @@ namespace spiritsaway::system::navigation
 		}
 	}
 
-	bool async_detour_crowd::move_to_pos(std::uint32_t agent_idx, const std::array<double, 3>& dest_pos, double radius, std::function<void()> finish_cb)
+	bool async_detour_crowd::move_to_pos(std::uint32_t agent_idx, const std::array<dtReal_t, 3>& dest_pos, dtReal_t radius, std::function<void()> finish_cb)
 	{
 		if (agent_idx >= m_max_agent_num)
 		{
@@ -85,7 +212,7 @@ namespace spiritsaway::system::navigation
 		return true;
 	}
 
-	bool async_detour_crowd::move_to_agent(std::uint32_t agent_idx, std::uint32_t dest_agent, double radius, std::function<void()> finish_cb)
+	bool async_detour_crowd::move_to_agent(std::uint32_t agent_idx, std::uint32_t dest_agent, dtReal_t radius, std::function<void()> finish_cb)
 	{
 		if (agent_idx >= m_max_agent_num || dest_agent >= m_max_agent_num)
 		{
@@ -142,7 +269,7 @@ namespace spiritsaway::system::navigation
 		return true;
 	}
 
-	bool async_detour_crowd::change_pos(std::uint32_t agent_idx, const std::array<double, 3>& pos)
+	bool async_detour_crowd::change_pos(std::uint32_t agent_idx, const std::array<dtReal_t, 3>& pos)
 	{
 		if (agent_idx >= m_max_agent_num)
 		{
@@ -164,7 +291,7 @@ namespace spiritsaway::system::navigation
 		return true;
 	}
 
-	bool async_detour_crowd::update_param(std::uint32_t agent_idx, const dtCrowdAgentParams& param)
+	bool async_detour_crowd::update_param(std::uint32_t agent_idx, const ExtendDetourCrowdAgentParams& param)
 	{
 		if (agent_idx >= m_max_agent_num)
 		{
@@ -221,6 +348,16 @@ namespace spiritsaway::system::navigation
 				}
 				break;
 			}
+			case agent_req_cmd::notify_move_finished:
+			{
+				if (cur_agent.state == agent_state::move_to_agent || cur_agent.state == agent_state::move_to_pos)
+				{
+					if (one_ack.ack_version == cur_agent.req_version)
+					{
+						cancel_move(one_ack.idx);
+					}
+				}
+			}
 			default:
 				break;
 			}
@@ -230,26 +367,6 @@ namespace spiritsaway::system::navigation
 	{
 		auto& cur_agent = m_agents[agent_idx];
 		auto cur_dest_pos = cur_agent.dest_pos;
-		if (cur_agent.state == agent_state::move_to_agent)
-		{
-			const auto& dest_agent = m_agents[cur_agent.dest_agent];
-			if (dest_agent.state == agent_state::inactive || dest_agent.state == agent_state::deleting)
-			{
-				cancel_move(agent_idx);
-				return;
-			}
-			cur_dest_pos = dest_agent.pos;
-		}
-		std::array<float, 3> diff_pos;
-		for (std::uint32_t i = 0; i < 3; i++)
-		{
-			diff_pos[i] = cur_dest_pos[i] - cur_agent.pos[i];
-		}
-		if (diff_pos[0] * diff_pos[0] + diff_pos[2] * diff_pos[2] < cur_agent.dest_radius * cur_agent.dest_radius)
-		{
-			cancel_move(agent_idx);
-			return;
-		}
 	}
 
 	void async_detour_crowd::update_dt_crowd(float dt)
@@ -292,13 +409,13 @@ namespace spiritsaway::system::navigation
 			}
 			case agent_req_cmd::move_to_agent:
 			{
-				//TODO
+				m_detour_crowd.requestMoveTarget(one_req.idx, one_req.dest_idx, one_req.radius, false);
 				break;
 			}
 			case agent_req_cmd::move_to_pos:
 			{
 				dtPolyRef dest_poly;
-				std::array<double, 3> dest_pos;
+				std::array<dtReal_t, 3> dest_pos;
 				one_ack.cmd_result = m_detour_crowd.getNavMeshQuery()->findNearestPoly(one_req.pos.data(), m_half_extend.data(), &m_query_filter, &dest_poly, dest_pos.data());
 				if (dtStatusSucceed(one_ack.cmd_result))
 				{
@@ -308,7 +425,7 @@ namespace spiritsaway::system::navigation
 			}
 			case agent_req_cmd::change_pos:
 			{
-				//TODO
+				m_detour_crowd.updateAgentPos(one_req.idx, one_req.pos.data());
 				break;
 			}
 			case agent_req_cmd::update_param:
@@ -323,12 +440,11 @@ namespace spiritsaway::system::navigation
 			m_temp_agent_ack_vec_in_update.push_back(one_ack);
 		}
 		m_detour_crowd.update(dt, nullptr);
-		std::vector<dtCrowdAgent*> active_agent_vec(m_max_agent_num, nullptr);
-		auto active_num = m_detour_crowd.getActiveAgents(active_agent_vec.data(), active_agent_vec.size());
-		dtCrowdAgent* idx_0_agent = m_detour_crowd.getEditableAgent(0);
-		for (std::uint32_t i = 0; i < active_num; i++)
+		auto active_num = m_detour_crowd.getActiveAgents(m_active_agent_vec.data(), m_active_agent_vec.size());
+		ExtendDetourCrowdAgent* idx_0_agent = m_detour_crowd.getEditableAgent(0);
+		for (int i = 0; i < active_num; i++)
 		{
-			auto cur_agent = active_agent_vec[i];
+			auto cur_agent = m_active_agent_vec[i];
 			agent_ack_info one_ack;
 			one_ack.idx = std::distance(idx_0_agent, cur_agent);
 			one_ack.ack_version = m_agent_ack_versions[one_ack.idx];
@@ -337,11 +453,46 @@ namespace spiritsaway::system::navigation
 			std::copy(cur_agent->npos, cur_agent->npos + 3, one_ack.pos.data());
 			m_temp_agent_ack_vec_in_update.push_back(one_ack);
 		}
+		auto finish_num = m_detour_crowd.fetchAndClearArrived(m_finished_agent_vec.data(), m_finished_agent_vec.size());
+		for (int i = 0; i < finish_num; i++)
+		{
+			agent_ack_info one_ack;
+			one_ack.idx = m_finished_agent_vec[i];
+			one_ack.ack_version = m_agent_ack_versions[one_ack.idx];
+			one_ack.cmd_result = 0;
+			one_ack.cmd = agent_req_cmd::notify_move_finished;
+			m_temp_agent_ack_vec_in_update.push_back(one_ack);
+		}
+
 		{
 			std::unique_lock<std::mutex> temp_lock(m_mutex);
 			std::swap(m_agent_acks, m_temp_agent_ack_vec_in_update);
 		}
+		m_dt_update_finish.store(true);
+	}
+	std::function<void()> async_detour_crowd::update(std::uint64_t cur_ms)
+	{
+		if (m_last_update_ms == 0)
+		{
+			m_last_update_ms = cur_ms;
+			return {};
+		}
+		
 
+		if (m_dt_update_finish)
+		{
+			process_acks();
+			m_dt_update_finish.store(false);
+			auto diff_ms = cur_ms - m_last_update_ms;
+			auto dt = diff_ms * 0.001;
+			m_last_update_ms = cur_ms;
+			return [this, dt]()
+			{
 
+				this->update_dt_crowd(dt);
+			};
+		}
+		return {};
+		
 	}
 }

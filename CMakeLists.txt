@@ -1,7 +1,6 @@
 cmake_minimum_required( VERSION 3.7 )
 project(async_detour_crowd)
 
-set(CMAKE_BUILD_TYPE Debug) 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -9,11 +8,26 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 if(MSVC)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /std:c++latest")
 set(PKG_CONFIG_EXECUTABLE "$ENV{usr}/bin/pkg-config.exe")
-endif(MSVC)
+add_library(DetourCrowd STATIC IMPORTED)
+add_library(Detour STATIC IMPORTED)
+set_target_properties(DetourCrowd PROPERTIES
+    IMPORTED_CONFIGURATIONS "Debug;Release"
+    IMPORTED_LOCATION "$ENV{usr}/lib/DetourCrowd.lib"
+    IMPORTED_LOCATION_DEBUG "$ENV{usr}/lib/DetourCrowd-d.lib")
+set_target_properties(Detour PROPERTIES
+    IMPORTED_CONFIGURATIONS "Debug;Release"
+    IMPORTED_LOCATION "$ENV{usr}/lib/Detour.lib"
+    IMPORTED_LOCATION_DEBUG "$ENV{usr}/lib/Detour-d.lib")
 
+
+endif(MSVC)
 include(FindPkgConfig)
-set(ENV{PKG_CONFIG_PATH} /usr/local/lib/pkgconfig)
+if(MSVC)
+set(ENV{PKG_CONFIG_PATH} "$ENV{usr}/lib/pkgconfig")
+endif(MSVC)
 pkg_search_module(RecastNavigation REQUIRED recastnavigation)
+
+
 INCLUDE_DIRECTORIES(${RecastNavigation_INCLUDE_DIRS})
 
 INCLUDE_DIRECTORIES(${CMAKE_SOURCE_DIR}/include)
@@ -22,7 +36,7 @@ FILE(GLOB_RECURSE SRC_LISTS ${CMAKE_SOURCE_DIR}/src/*.cpp)
 FILE(GLOB_RECURSE HEADER_LISTS ${CMAKE_SOURCE_DIR}/include/*.h)
 
 add_library(${PROJECT_NAME} ${SRC_LISTS} ${HEADER_LISTS})
-target_link_libraries(${PROJECT_NAME} DetourCrowd)
+target_link_libraries(${PROJECT_NAME} DetourCrowd Detour)
 add_subdirectory(./test)
 
 foreach(p LIB BIN INCLUDE)

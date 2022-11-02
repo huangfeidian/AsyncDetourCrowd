@@ -1,0 +1,4 @@
+
+add_executable(file_load_test file_load_test.cpp)
+
+target_link_libraries(file_load_test async_detour_crowd)
