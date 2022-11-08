@@ -7,6 +7,8 @@
 #include <deque>
 #include <mutex>
 #include <optional>
+#include <atomic>
+
 namespace spiritsaway::system::navigation
 {
 	class async_detour_crowd

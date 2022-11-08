@@ -1,4 +1,5 @@
 #include "async_detour_crowd.h"
+#include <cstring>
 
 namespace
 {
@@ -72,7 +73,7 @@ namespace
 
 			unsigned char* data = (unsigned char*)dtAlloc(tileHeader.dataSize, DT_ALLOC_PERM);
 			if (!data) break;
-			memset(data, 0, tileHeader.dataSize);
+			std::memset(data, 0, tileHeader.dataSize);
 			readLen = fread(data, tileHeader.dataSize, 1, fp);
 			if (readLen != 1)
 			{
