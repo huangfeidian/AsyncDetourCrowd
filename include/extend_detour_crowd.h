@@ -223,7 +223,7 @@ public:
 	///  @param[in]		maxAgentRadius	The maximum radius of any agent that will be added to the crowd. [Limit: > 0]
 	///  @param[in]		nav				The navigation mesh to use for planning.
 	/// @return True if the initialization succeeded.
-	bool init(const int maxAgents, const dtReal_t maxAgentRadius, dtNavMesh* nav);
+	std::uint32_t init(const int maxAgents, const dtReal_t maxAgentRadius, dtNavMesh* nav);
 
 	/// Gets the specified agent from the pool.
 	///	 @param[in]		idx		The agent index. [Limits: 0 <= value < #getAgentCount()]

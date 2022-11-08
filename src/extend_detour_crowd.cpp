@@ -373,7 +373,7 @@ void ExtendDetourCrowd::purge()
 /// @par
 ///
 /// May be called more than once to purge and re-initialize the crowd.
-bool ExtendDetourCrowd::init(const int maxAgents, const dtReal_t maxAgentRadius, dtNavMesh* nav)
+std::uint32_t ExtendDetourCrowd::init(const int maxAgents, const dtReal_t maxAgentRadius, dtNavMesh* nav)
 {
 	purge();
 
@@ -388,29 +388,29 @@ bool ExtendDetourCrowd::init(const int maxAgents, const dtReal_t maxAgentRadius,
 	m_maxPathResult = 256;
 	m_pathResult = (dtPolyRef*) dtAlloc(sizeof(dtPolyRef)*m_maxPathResult, DT_ALLOC_PERM);
 	if (!m_pathResult)
-		return false;
+		return __LINE__;
 
 	if (!m_pathq.init(m_maxPathResult, MAX_PATHQUEUE_NODES, nav))
-		return false;
+		return __LINE__;
 
 	m_agents = (ExtendDetourCrowdAgent*) dtAlloc(sizeof(ExtendDetourCrowdAgent)*m_maxAgents, DT_ALLOC_PERM);
 	if (!m_agents)
-		return false;
+		return __LINE__;
 
 	m_activeAgents = (ExtendDetourCrowdAgent**) dtAlloc(sizeof(ExtendDetourCrowdAgent*)*m_maxAgents, DT_ALLOC_PERM);
 	if (!m_activeAgents)
-		return false;
+		return __LINE__;
 
 	m_agentAnims = (ExtendDetourCrowdAgentAnimation*) dtAlloc(sizeof(ExtendDetourCrowdAgentAnimation)*m_maxAgents, DT_ALLOC_PERM);
 	if (!m_agentAnims)
-		return false;
+		return __LINE__;
 
 	for (int i = 0; i < m_maxAgents; ++i)
 	{
 		new(&m_agents[i]) ExtendDetourCrowdAgent();
 		m_agents[i].active = false;
 		if (!m_agents[i].corridor.init(m_maxPathResult))
-			return false;
+			return __LINE__;
 	}
 
 	for (int i = 0; i < m_maxAgents; ++i)
@@ -421,11 +421,11 @@ bool ExtendDetourCrowd::init(const int maxAgents, const dtReal_t maxAgentRadius,
 	// The navquery is mostly used for local searches, no need for large node pool.
 	m_navquery = dtAllocNavMeshQuery();
 	if (!m_navquery)
-		return false;
+		return __LINE__;
 	if (dtStatusFailed(m_navquery->init(nav, MAX_COMMON_NODES)))
-		return false;
+		return __LINE__;
 
-	return true;
+	return 0;
 }
 
 int ExtendDetourCrowd::getAgentCount() const

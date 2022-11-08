@@ -92,7 +92,7 @@ namespace spiritsaway::system::navigation
 		void add_agent_req(agent_req_info&& cur_req);
 	public:
 		async_detour_crowd(std::uint32_t max_agent_num);
-		bool init(const std::string& nav_map, const std::array<dtReal_t, 3>& half_extend, dtReal_t max_agent_radius);
+		std::uint32_t init(const std::string& nav_map, const std::array<dtReal_t, 3>& half_extend, dtReal_t max_agent_radius);
 		std::optional<std::uint32_t> add_agent(const ExtendDetourCrowdAgentParams& param, const std::array<dtReal_t, 3>& pos);
 		bool remove_agent(std::uint32_t agent_idx);
 		bool move_to_pos(std::uint32_t agent_idx, const std::array<dtReal_t, 3>& dest_pos, dtReal_t radius, std::function<void()> finish_cb);

@@ -20,10 +20,10 @@ namespace
 		int dataSize;
 	};
 #pragma pack(pop)
-	dtNavMesh* load_nav_mesh(const char* path)
+	std::uint32_t load_nav_mesh(const char* path, dtNavMesh** navmesh)
 	{
 		FILE* fp = fopen(path, "rb");
-		if (!fp) return 0;
+		if (!fp) return __LINE__;
 
 		// Read header.
 		NavMeshSetHeader header;
@@ -31,30 +31,30 @@ namespace
 		if (readLen != 1)
 		{
 			fclose(fp);
-			return 0;
+			return __LINE__;
 		}
 		if (header.magic != NAVMESHSET_MAGIC)
 		{
 			fclose(fp);
-			return 0;
+			return __LINE__;
 		}
 		if (header.version != NAVMESHSET_VERSION)
 		{
 			fclose(fp);
-			return 0;
+			return __LINE__;
 		}
 
 		dtNavMesh* mesh = dtAllocNavMesh();
 		if (!mesh)
 		{
 			fclose(fp);
-			return 0;
+			return __LINE__;
 		}
 		dtStatus status = mesh->init(&header.params);
 		if (dtStatusFailed(status))
 		{
 			fclose(fp);
-			return 0;
+			return status;
 		}
 
 		// Read tiles.
@@ -65,7 +65,7 @@ namespace
 			if (readLen != 1)
 			{
 				fclose(fp);
-				return 0;
+				return __LINE__;
 			}
 
 			if (!tileHeader.tileRef || !tileHeader.dataSize)
@@ -79,15 +79,15 @@ namespace
 			{
 				dtFree(data);
 				fclose(fp);
-				return 0;
+				return __LINE__;
 			}
 
 			mesh->addTile(data, tileHeader.dataSize, DT_TILE_FREE_DATA, tileHeader.tileRef, 0);
 		}
 
 		fclose(fp);
-
-		return mesh;
+		*navmesh = mesh;
+		return 0;
 	}
 }
 namespace spiritsaway::system::navigation
@@ -109,25 +109,26 @@ namespace spiritsaway::system::navigation
 		std::reverse(m_inactive_agent_idxes.begin(), m_inactive_agent_idxes.end());
 	}
 
-	bool async_detour_crowd::init(const std::string& nav_map, const std::array<dtReal_t, 3>& half_extend, dtReal_t max_agent_radius)
+	std::uint32_t async_detour_crowd::init(const std::string& nav_map, const std::array<dtReal_t, 3>& half_extend, dtReal_t max_agent_radius)
 	{
 		if (m_navmesh)
 		{
-			return false;
+			return 100;
 		}
 		m_half_extend = half_extend;
-		m_navmesh = load_nav_mesh(nav_map.c_str());
+		std::uint32_t load_err = load_nav_mesh(nav_map.c_str(), &m_navmesh);
 		if (!m_navmesh)
 		{
-			return false;
+			return load_err;
 		}
-		if (!m_detour_crowd.init(m_max_agent_num, max_agent_radius, m_navmesh))
+		auto init_err = m_detour_crowd.init(m_max_agent_num, max_agent_radius, m_navmesh);
+		if (init_err != 0)
 		{
 			dtFreeNavMesh(m_navmesh);
 			m_navmesh = nullptr;
-			return false;
+			return init_err;
 		}
-		return true;
+		return 0;
 
 	}
 	void async_detour_crowd::add_agent_req(agent_req_info&& cur_req)
