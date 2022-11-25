@@ -20,6 +20,7 @@ namespace spiritsaway::system::navigation
 			idle,
 			move_to_pos,
 			move_to_agent,
+			move_follow_agent,
 			finished,
 			deleting,
 
@@ -30,6 +31,7 @@ namespace spiritsaway::system::navigation
 			remove,
 			move_to_pos,
 			move_to_agent,
+			move_follow_agent,
 			cancel,
 			change_pos,
 			update_param,
@@ -97,6 +99,7 @@ namespace spiritsaway::system::navigation
 		bool remove_agent(std::uint32_t agent_idx);
 		bool move_to_pos(std::uint32_t agent_idx, const std::array<dtReal_t, 3>& dest_pos, dtReal_t radius, std::function<void()> finish_cb);
 		bool move_to_agent(std::uint32_t agent_idx, std::uint32_t dest_agent, dtReal_t radius, std::function<void()> finish_cb);
+		bool move_follow_agent(std::uint32_t agent_idx, std::uint32_t dest_agent, dtReal_t radius);
 		bool cancel_move(std::uint32_t agent_idx);
 		bool change_pos(std::uint32_t agent_idx, const std::array<dtReal_t, 3>& pos);
 		bool update_param(std::uint32_t agent_idx, const ExtendDetourCrowdAgentParams& param);

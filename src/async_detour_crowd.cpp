@@ -245,6 +245,36 @@ namespace spiritsaway::system::navigation
 		add_agent_req(std::move(cur_req));
 		return true;
 	}
+	bool async_detour_crowd::move_follow_agent(std::uint32_t agent_idx, std::uint32_t dest_agent, dtReal_t radius)
+	{
+		if (agent_idx >= m_max_agent_num || dest_agent >= m_max_agent_num)
+		{
+			return false;
+		}
+		auto& cur_agent = m_agents[agent_idx];
+		if (cur_agent.state != agent_state::idle)
+		{
+			return false;
+		}
+		auto dest_agent_state = m_agents[dest_agent].state;
+		if (dest_agent_state == agent_state::inactive || dest_agent_state == agent_state::deleting)
+		{
+			return false;
+		}
+
+		cur_agent.state = agent_state::move_follow_agent;
+		cur_agent.dest_agent = dest_agent;
+		cur_agent.dest_radius = radius;
+		cur_agent.req_version++;
+		agent_req_info cur_req;
+		cur_req.cmd = agent_req_cmd::move_follow_agent;
+		cur_req.req_version = cur_agent.req_version;
+		cur_req.idx = agent_idx;
+		cur_req.dest_idx = dest_agent;
+		cur_req.radius = radius;
+		add_agent_req(std::move(cur_req));
+		return true;
+	}
 	bool async_detour_crowd::cancel_move(std::uint32_t agent_idx)
 	{
 		if (agent_idx >= m_max_agent_num)
@@ -252,7 +282,7 @@ namespace spiritsaway::system::navigation
 			return false;
 		}
 		auto& cur_agent = m_agents[agent_idx];
-		if (cur_agent.state != agent_state::move_to_pos && cur_agent.state != agent_state::move_to_agent)
+		if (cur_agent.state != agent_state::move_to_pos && cur_agent.state != agent_state::move_to_agent && cur_agent.state != agent_state::move_to_agent)
 		{
 			return false;
 		}
@@ -330,7 +360,7 @@ namespace spiritsaway::system::navigation
 			{
 			case agent_req_cmd::sync_pos:
 			{
-				if (cur_agent.state == agent_state::move_to_agent || cur_agent.state == agent_state::move_to_pos)
+				if (cur_agent.state == agent_state::move_to_agent || cur_agent.state == agent_state::move_to_pos || cur_agent.state == agent_state::move_follow_agent)
 				{
 					if (one_ack.ack_version == cur_agent.req_version)
 					{
@@ -352,7 +382,7 @@ namespace spiritsaway::system::navigation
 			}
 			case agent_req_cmd::notify_move_finished:
 			{
-				if (cur_agent.state == agent_state::move_to_agent || cur_agent.state == agent_state::move_to_pos)
+				if (cur_agent.state == agent_state::move_to_agent || cur_agent.state == agent_state::move_to_pos || cur_agent.state == agent_state::move_follow_agent)
 				{
 					if (one_ack.ack_version == cur_agent.req_version)
 					{
@@ -412,6 +442,11 @@ namespace spiritsaway::system::navigation
 			case agent_req_cmd::move_to_agent:
 			{
 				m_detour_crowd.requestMoveTarget(one_req.idx, one_req.dest_idx, one_req.radius, false);
+				break;
+			}
+			case agent_req_cmd::move_follow_agent:
+			{
+				m_detour_crowd.requestMoveTarget(one_req.idx, one_req.dest_idx, one_req.radius, true);
 				break;
 			}
 			case agent_req_cmd::move_to_pos:
