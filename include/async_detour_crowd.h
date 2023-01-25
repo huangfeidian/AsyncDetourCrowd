@@ -104,6 +104,15 @@ namespace spiritsaway::system::navigation
 		bool change_pos(std::uint32_t agent_idx, const std::array<dtReal_t, 3>& pos);
 		bool update_param(std::uint32_t agent_idx, const ExtendDetourCrowdAgentParams& param);
 		std::function<void()> update(std::uint64_t cur_ms);
+		const dtNavMesh* navmesh() const
+		{
+			return m_navmesh;
+		}
+
+		ExtendDetourCrowd& crowd_impl()
+		{
+			return m_detour_crowd;
+		}
 	protected:
 		void update_dt_crowd(float dt);
 		void process_acks();

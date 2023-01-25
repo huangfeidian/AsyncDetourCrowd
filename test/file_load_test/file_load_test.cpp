@@ -9,6 +9,20 @@ int main()
 	if (init_err)
 	{
 		std::cout << "fail to load navmesh with err " << init_err<<std::endl;
+		return 0;
 	}
+	auto& cur_crowd_impl = cur_crowd.crowd_impl();
+	auto m_navquery = dtAllocNavMeshQuery();
+	if (dtStatusFailed(m_navquery->init(cur_crowd.navmesh(), 512)))
+	{
+		std::cout<<"fail to init navmesh qeury"<<std::endl;
+		return 0;
+	}
+	std::array<dtReal_t, 3> pos{ 0,0,0 };
+	std::array<dtReal_t, 3> extend{ 8,6,8 };
+	dtQueryFilter default_filer;
+	dtPolyRef result;
+	std::array<dtReal_t, 3> nearst;
+	m_navquery->findNearestPoly(pos.data(), extend.data(), &default_filer, &result, nearst.data());
 	return 0;
 }
