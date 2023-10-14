@@ -4,7 +4,7 @@
 #include "DetourPathQueue.h"
 #include "DetourCrowd.h"
 #include <unordered_set>
-
+#include <cstdint>
 namespace spiritsaway::system::navigation
 {
 
