@@ -8,6 +8,7 @@
 #include <mutex>
 #include <optional>
 #include <atomic>
+#include <string>
 
 namespace spiritsaway::system::navigation
 {
